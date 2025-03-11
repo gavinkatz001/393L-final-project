@@ -4,6 +4,9 @@ unsigned long gdMills() {
   return gdMillis;
 }
 
+// define ISR protocol to perform an action when timer1 == OCR1A 
+//we know to compare timer1 to OCR1A because this is specified by the TIMER1_COMPA_vect vector, which defines the comparison behavior for the processor to execute
+// this is the same as saying: trigger an interrupt and add 1 to gdMillis when timer1 has had 2000 ticks (aka 1 ms, has passed) 
 ISR(TIMER1_COMPA_vect){
   gdMillis++; 
 }
