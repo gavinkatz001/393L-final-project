@@ -48,8 +48,8 @@ volatile bool buttonPressed = false;
 // other
 bool scale = false;
 int numRounds = 0;
-float P1Score = 0.0;
-float P2Score = 0.0;
+float P1Score = 0.0; // TO BE IMPLEMENTED ON ARD2
+float P2Score = 0.0; // TO BE IMPLEMENTED ON ARD2
 int randomLEDP1 = 0;
 int randomLEDP2 = 0;
 int windowEnd = 2001;
@@ -154,7 +154,7 @@ bool isGameOver() {
 void displayScores() {
   P1Score = (1.0 / (totalRxnTimeP1 / maxRounds)) * 100.0;
   P2Score = (1.0 / (totalRxnTimeP2 / maxRounds)) * 100.0;
-}
+} // TO BE IMPLEMENTED ON ARD2
 
 void idle() {
   if (!gameIsOver) {return;}  // do nothing if game is not over
@@ -249,8 +249,9 @@ int getButton(byte msb, byte lsb) {
   return value;
 }
 
-void pause(int cycles) {
-  for (int i = 0; i < cycles; i++) {asm volatile("nop");} // do nothing to kill time. include assembly no operation instruction to avoid being optimized away
+void pause(int millisToDelay) {
+  unsigned long startTime = gdMills();
+  while (gdMills() - startTime < millisToDelay) {asm volatile("nop");}  // do nothing to kill time. include assembly no operation instruction to avoid being optimized away
 }
 
 uint16_t generateRandomSeed(int analogPin = 0, int cycleCount = 200) {
@@ -390,7 +391,7 @@ void loop() {
   }
 
   if (LEDTimerExpiredP1 && LEDTimerExpiredP2 && P1HasReacted && P2HasReacted) {
-      pause(10000000000000000000000000000000000000); // delay between rounds 
+      pause(10000); // delay between rounds 
       roundInProgress = false;
       roundTimes[numRounds - 1] = gdMills() - roundStartTime;
       startNewRound(); // start next round
@@ -398,6 +399,21 @@ void loop() {
     // TODO: 1. exit game if a player loses 2. save times for round, game, and individual rxn times of each player 3. idle state 4. single player mode 5. class???? 6. scoring 7. debounce handling
 }
 
+/* 
+
+to send to ard2:
+
+- P1RxnTimes array -> this is the per-round rxn time. 
+- P2RxnTimes array -> this is the per-round rxn time. 
+- roundTimes array -> round times
+- totalRxnTimeP1 -> cumulative rxn time
+- totalRxnTimeP2 -> cumulative rxn time
+- totalGameTime -> total elasped game time
+- numRounds -> total rounds played
+
+*/ 
 
 
+
+ 
 
