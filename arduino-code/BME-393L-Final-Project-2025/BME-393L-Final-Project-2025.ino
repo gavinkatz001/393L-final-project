@@ -328,7 +328,7 @@ void setup() {
   // reset timer1 = 0
   TCNT1 = 0;
    
-  // for good practice, clear register before setting bits 
+  // clear register before setting bits 
   TCCR1B = 0;
 
   // set up timer1 with prescale = 8 
