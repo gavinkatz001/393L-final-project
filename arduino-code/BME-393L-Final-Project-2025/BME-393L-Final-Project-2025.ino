@@ -334,7 +334,7 @@ void setup() {
   // set up timer1 with prescale = 8 
   TCCR1B |= 1 << CS11;
 
-  // set value to compare timer1 against
+  // set value of output compare register A to compare timer1 against
   OCR1A = 1999;
 
   // set arduino to CTC mode (clear timer on compare)
