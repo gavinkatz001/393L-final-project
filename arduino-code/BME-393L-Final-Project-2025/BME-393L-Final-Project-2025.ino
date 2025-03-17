@@ -9,6 +9,7 @@ const int p1LED_1 = 5;
 const int p1LED_2 = 6;
 const int p2LED_1 = 8;
 const int p2LED_2 = 9;
+const int maxRounds = 7;
 
 // flags
 bool LEDTimerExpiredP1 = false;
@@ -16,18 +17,26 @@ bool LEDTimerExpiredP2 = false;
 bool P1Lost = false;
 bool P2Lost = false;
 bool roundInProgress = false; 
+bool roundOver = false;
+bool P1HasReacted = false;
+bool P2HasReacted = false;
+bool gameOver = (P1Lost | P2Lost);
+
 
 // time-related variables 
 unsigned long LEDStartTimeP1 = 0;
 unsigned long LEDStartTimeP2 = 0;
+unsigned long roundStartTime = 0;
 int randomLEDTimerP1 = 0;
 int randomLEDTimerP2 = 0;
-int P1RxnTime = 0; // this is the per-round rxn time. would need to make this into an array
-int P2RxnTime = 0; // this is the per-round rxn time. would need to make this into an array
+int P1RxnTime[maxRounds]; // this is the per-round rxn time. 
+int P2RxnTime[maxRounds]; // this is the per-round rxn time. 
+int roundTimes[maxRounds];
 unsigned long rxnStartTimeP1 = 0;
 unsigned long rxnStartTimeP2 = 0;
 int totalRxnTimeP1 = 0;
 int totalRxnTimeP2 = 0;
+
 
 // volatile variables 
 volatile int buttonValue = -1;
@@ -40,6 +49,7 @@ int P1Score = 0;
 int P2Score = 0;
 int randomLEDP1 = 0;
 int randomLEDP2 = 0;
+int windowEnd = 2001;
 
 
 void ISRTrigger() { 
@@ -59,12 +69,73 @@ void validateButtonPress(int button, int ledP1, int ledP2) { // general function
 void validateP1ButtonPress(int button, int led) { 
   if (!LEDTimerExpiredP1) {P1Lost = true;}
   else if (led - button != 5) {P1Lost = true;}
+
 }
 
 void validateP2ButtonPress(int button, int led) { 
   if (!LEDTimerExpiredP2) {P2Lost = true;}  
   else if (led - button != 6) {P2Lost = true;}
 }
+
+void checkForDoublePress(int button) {
+  if (button == 0 || button == 1) {
+    if (P1HasReacted) {
+      P1Lost = true;
+      roundInProgress = false;
+    } else {
+      P1HasReacted = true;
+    }
+  }
+  if (button == 2 || button == 3) {
+    if (P2HasReacted) {
+      P2Lost = true;
+      roundInProgress = false;
+      Serial.println("P2 double-pressed. Round lost.");
+    } else {
+      P2HasReacted = true;
+    }
+  }
+}
+
+void handleButtonPress() {
+  if (buttonPressed) {
+      // reset flag
+      buttonPressed = false;
+
+      checkForDoublePress(buttonValue); // check if button for a given player was already pressed this round
+
+      // check that neither player has double clicked. 
+      if (!P1Lost && !P2Lost) {
+        // process button press
+        validateButtonPress(buttonValue, randomLEDP1, randomLEDP2); // make sure the button was correct and not pushed premautrely  
+
+        // clock reaction time 
+        if (!P1Lost && !P2Lost) { 
+          if (buttonValue == 0 || buttonValue == 1) {
+            int roundRxnTimeP1 = gdMills() - rxnStartTimeP1;
+            P1RxnTime[numRounds - 1] = roundRxnTimeP1;
+            totalRxnTimeP1 += roundRxnTimeP1;
+            }
+          else if (buttonValue == 2 || buttonValue == 3) {
+            int roundRxnTimeP2 = gdMills() - rxnStartTimeP2;
+            P2RxnTime[numRounds - 1] = roundRxnTimeP2;
+            totalRxnTimeP2 += roundRxnTimeP2;
+            }
+        }
+        else {
+          // somehow stop the game by setting an indicator light or something and then going to idle mode
+          roundInProgress = false;
+          // exit game logic here
+        }
+      }
+      else {
+        roundInProgress = false;
+        // exit game logic here
+      } 
+    }
+  else {return;}
+}
+
 
 float randomFloat(float min, float max) {
   if (scale) { // only start scaling after the first round
@@ -113,29 +184,34 @@ void startNewRound() {
   // increase number of rounds
   numRounds++;
 
-  // reset timer flags
+  // reset flags
   LEDTimerExpiredP1 = false; 
   LEDTimerExpiredP2 = false;
+  P1HasReacted = false;
+  P2HasReacted = false;
   
   // get random seed for this round
   int roundSeed = generateRandomSeed();
   randomSeed(roundSeed);
   
   // get random scalers
-  float randomScalerP1 = randomFloat(0.5, 0.99);
-  float randomScalerP2 = randomFloat(0.5, 0.99);
+  float randomScaler = randomFloat(0.5, 0.99);
+
+  // make the end of the time window smaller each round
+  windowEnd = windowEnd * randomScaler;
 
   // reset timers
-  randomLEDTimerP1 = random(200, 2001 * randomScalerP1); // should we do the same scaler for both players so that one player isnt at a disadvantage if their scaler is very small?
-  randomLEDTimerP2 = random(200, 2001 * randomScalerP2);
+  randomLEDTimerP1 = random(200, windowEnd); 
+  randomLEDTimerP2 = random(200, windowEnd);
 
   // pick a random LED for each player for the round
   randomLEDP1 = pickRandomLED(p1LED_1, p1LED_2);
   randomLEDP2 = pickRandomLED(p2LED_1, p2LED_2);
 
-  // set the timer for the round
+  // set the timers for the round
   LEDStartTimeP1 = gdMills();
   LEDStartTimeP2 = gdMills();
+  roundStartTime = gdMills();
   
   digitalWrite(randomLEDP1, LOW);
   digitalWrite(randomLEDP2, LOW);
@@ -174,33 +250,27 @@ void setup() {
   TCCR1B |= 1 << WGM12;
 
   // set control bit to enable compare match A interrupt (comparing against OCR1A)
-  TIMSK1 |= (1 << OCIE1A);  
+  TIMSK1 |= (1 << OCIE1A);
+
+  // set up pin modes
+  pinMode(MSB, INPUT);
+  pinMode(LSB, INPUT);
+  pinMode(p1LED_1, OUTPUT);
+  pinMode(p1LED_2, OUTPUT);
+  pinMode(p2LED_1, OUTPUT);
+  pinMode(p2LED_2, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), ISRTrigger, RISING); 
 
   interrupts(); // enable interrupts
 
+  // and we're off
   startNewRound();
 }
 
 void loop() {
   if (roundInProgress) {
-  
-    if (buttonPressed) {
-      // reset flag
-      buttonPressed = false;
 
-      // process button press
-      validateButtonPress(buttonValue, randomLEDP1, randomLEDP2); // make sure the button was correct and not pushed premautrely  
-
-      // clock reaction time 
-      if (!P1Lost && !P2Lost) { 
-        if (buttonValue == 0 || buttonValue == 1) {totalRxnTimeP1 += gdMills() - rxnStartTimeP1;}
-        else if (buttonValue == 2 || buttonValue == 3) {totalRxnTimeP2 += gdMills() - rxnStartTimeP2;}
-      }
-      else {
-        // somehow stop the game by setting an indicator light or something and then going to idle mode
-        roundInProgress = false;
-      }
-    }
+    handleButtonPress(); // in case players click button before light turns on
 
     if ((!LEDTimerExpiredP1) && (gdMills() - LEDStartTimeP1 >= randomLEDTimerP1)) {
       LEDTimerExpiredP1 = true; // set flag 
@@ -209,34 +279,27 @@ void loop() {
       // do more stuff
     }
 
+    handleButtonPress();
+
     if ((!LEDTimerExpiredP2) && (gdMills() - LEDStartTimeP2 >= randomLEDTimerP2)) {
       LEDTimerExpiredP2 = true; // set flag
       digitalWrite(randomLEDP2, HIGH); // turn LED on
       rxnStartTimeP2 = gdMills(); // start reaction timer
       // do more stuff 
     }
+
+     handleButtonPress();
+     // each time we call handleButtonPress(), we are checking if a button was pressed, validating the press if it happened, and logging rxn time after validation. otherwise, continue the loop function
   }
 
   if (LEDTimerExpiredP1 && LEDTimerExpiredP2) {
       pause(100000); // delay between rounds (dont really need this)
       roundInProgress = false;
+      roundTimes[numRounds - 1] = gdMills - roundStartTime;
       startNewRound(); // start next round
     }
     // TODO: 1. exit game if a player loses 2. save times for round, game, and individual rxn times of each player 3. idle state 4. single player mode 5. class???? 6. scoring 7. debounce handling
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
