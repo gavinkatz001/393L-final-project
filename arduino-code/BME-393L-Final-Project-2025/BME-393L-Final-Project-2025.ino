@@ -11,7 +11,7 @@ const int p2LED_1 = 8;
 const int p2LED_2 = 9;
 const int idleLED = 10;
 const int idleButton = 4;
-const int maxRounds = 7;
+const int maxRounds = 25;
 
 // flags
 bool LEDTimerExpiredP1 = false;
@@ -151,10 +151,30 @@ bool isGameOver() {
   return false;  
 }
 
-void displayScores() {
-  P1Score = (1.0 / (totalRxnTimeP1 / maxRounds)) * 100.0;
-  P2Score = (1.0 / (totalRxnTimeP2 / maxRounds)) * 100.0;
-} // TO BE IMPLEMENTED ON ARD2
+void getScores() {
+  P1Score = (1.0 / (totalRxnTimeP1 / numRounds)) * 100.0;
+  P2Score = (1.0 / (totalRxnTimeP2 / numRounds)) * 100.0;
+} // to be implemented on ard2
+
+void blinkFast(int ledPin) {
+  digitalWrite(ledPin, LOW);
+  pause(100);
+  digitalWrite(ledPin, HIGH);
+  pause(100);
+  digitalWrite(ledPin, LOW);
+  pause(100);
+  digitalWrite(ledPin, HIGH);
+  pause(100);
+  digitalWrite(ledPin, LOW);
+  pause(100);
+  digitalWrite(ledPin, HIGH);
+  pause(100);
+  digitalWrite(ledPin, LOW);
+  pause(100);
+  digitalWrite(ledPin, HIGH);
+  pause(100);
+  digitalWrite(ledPin, LOW);
+}
 
 void idle() {
   if (!gameIsOver) {return;}  // do nothing if game is not over
@@ -165,7 +185,7 @@ void idle() {
   while (true) {
     digitalWrite(idleLED, HIGH);
     if (digitalRead(idleButton) == HIGH) {
-      digitalWrite(idleLED, LOW);
+      blinkFast(idleLED);
       resetGame();
       break;
     }
@@ -251,7 +271,7 @@ int getButton(byte msb, byte lsb) {
 
 void pause(int millisToDelay) {
   unsigned long startTime = gdMills();
-  while (gdMills() - startTime < millisToDelay) {asm volatile("nop");}  // do nothing to kill time. include assembly no operation instruction to avoid being optimized away
+  while (gdMills() - startTime < millisToDelay) {}  // do nothing to kill time. include assembly no operation instruction to avoid being optimized away
 }
 
 uint16_t generateRandomSeed(int analogPin = 0, int cycleCount = 200) {
@@ -303,9 +323,6 @@ void startNewRound() {
   LEDStartTimeP1 = gdMills();
   LEDStartTimeP2 = gdMills();
   roundStartTime = gdMills();
-  
-  digitalWrite(randomLEDP1, LOW);
-  digitalWrite(randomLEDP2, LOW);
 
   scale = true; // enable scaling for next round
   roundInProgress = true;
@@ -391,7 +408,6 @@ void loop() {
   }
 
   if (LEDTimerExpiredP1 && LEDTimerExpiredP2 && P1HasReacted && P2HasReacted) {
-      pause(10000); // delay between rounds 
       roundInProgress = false;
       roundTimes[numRounds - 1] = gdMills() - roundStartTime;
       startNewRound(); // start next round
@@ -402,15 +418,16 @@ void loop() {
 /* 
 
 to send to ard2:
+- numRounds -> total rounds played
+- totalRxnTimeP1 -> cumulative rxn time
+- totalRxnTimeP2 -> cumulative rxn time
+
+to write to a file:
 
 - P1RxnTimes array -> this is the per-round rxn time. 
 - P2RxnTimes array -> this is the per-round rxn time. 
 - roundTimes array -> round times
-- totalRxnTimeP1 -> cumulative rxn time
-- totalRxnTimeP2 -> cumulative rxn time
 - totalGameTime -> total elasped game time
-- numRounds -> total rounds played
-
 */ 
 
 
