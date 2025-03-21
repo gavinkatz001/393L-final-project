@@ -23,7 +23,6 @@ bool roundInProgress = false;
 bool P1HasReacted = false;
 bool P2HasReacted = false;
 bool gameIsOver = true;
-bool gameHasBeenPlayed = false;
 
 // time-related variables 
 unsigned long LEDStartTimeP1 = 0;
@@ -208,7 +207,6 @@ void resetGame() {
   P2HasReacted = false;
   roundInProgress = false;
   gameIsOver = false;
-  gameHasBeenPlayed = false;
 
 
   // Reset time-related variables
@@ -291,16 +289,13 @@ uint16_t generateRandomSeed(int analogPin = 0, int cycleCount = 200) {
 }
 
 void startNewRound() {
-  gameHasBeenPlayed = true;
 
   if (isGameOver()) { // check if game needs to be ended before starting a new round
     roundInProgress = false;
     gameIsOver = true;
     totalGameTime = gdMills() - gameStartTime; // get the total game time
-    if (gameHasBeenPlayed) {
-      sendPacket(totalRxnTimeP1, totalRxnTimeP2, numRounds); // if a game has been played, send data to ArdB
-      printGameData();
-    }
+    sendPacket(totalRxnTimeP1, totalRxnTimeP2, numRounds); // if a game has been played, send data to ArdB
+    printGameData(); // print the timing arrays 
     return;
   }
   
@@ -469,6 +464,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interruptPin), ISRTrigger, RISING); 
 
   interrupts(); // enable interrupts
+  
+  Serial.begin(9600); 
 
   // and we're off
   idle();
