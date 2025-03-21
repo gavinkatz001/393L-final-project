@@ -1,7 +1,7 @@
 // global variables 
 volatile unsigned long gdMillis = 0; // variable to keep track of time
 
-// pins to be used on the arduino board (can add more for the game start buttons)
+// pins to be used on the arduino board 
 const int interruptPin = 2;
 const byte LSB = 11;
 const byte MSB = 12;
@@ -11,7 +11,8 @@ const int p2LED_1 = 8;
 const int p2LED_2 = 9;
 const int idleLED = 10;
 const int idleButton = 4;
-const int maxRounds = 25;
+const int dataOutPin = 7;  // communication pin to talk to ard B
+
 
 // flags
 bool LEDTimerExpiredP1 = false;
@@ -22,6 +23,7 @@ bool roundInProgress = false;
 bool P1HasReacted = false;
 bool P2HasReacted = false;
 bool gameIsOver = true;
+bool gameHasBeenPlayed = false;
 
 // time-related variables 
 unsigned long LEDStartTimeP1 = 0;
@@ -30,9 +32,9 @@ unsigned long roundStartTime = 0;
 unsigned long gameStartTime = 0;
 int randomLEDTimerP1 = 0;
 int randomLEDTimerP2 = 0;
-int P1RxnTimes[maxRounds]; // this is the per-round rxn time. 
-int P2RxnTimes[maxRounds]; // this is the per-round rxn time. 
-int roundTimes[maxRounds]; // time the rounds 
+int P1RxnTimes[maxRounds] = {0}; // this is the per-round rxn time. 
+int P2RxnTimes[maxRounds] = {0}; // this is the per-round rxn time. 
+int roundTimes[maxRounds] = {0}; // time the rounds 
 unsigned long rxnStartTimeP1 = 0;
 unsigned long rxnStartTimeP2 = 0;
 int totalRxnTimeP1 = 0;
@@ -46,6 +48,7 @@ volatile int buttonValue = -1;
 volatile bool buttonPressed = false;
 
 // other
+const int maxRounds = 7;
 bool scale = false;
 int numRounds = 0;
 float P1Score = 0.0; // TO BE IMPLEMENTED ON ARD2
@@ -55,6 +58,9 @@ int randomLEDP2 = 0;
 int windowEnd = 2001;
 
 
+// --------------------------------------------- //
+// GAME FUNCTIONS 
+// --------------------------------------------- //
 void ISRTrigger() { 
   buttonValue = getButton(MSB, LSB); // get button that was pushed 
   buttonPressed = true;
@@ -202,6 +208,7 @@ void resetGame() {
   P2HasReacted = false;
   roundInProgress = false;
   gameIsOver = false;
+  gameHasBeenPlayed = false;
 
 
   // Reset time-related variables
@@ -284,11 +291,16 @@ uint16_t generateRandomSeed(int analogPin = 0, int cycleCount = 200) {
 }
 
 void startNewRound() {
+  gameHasBeenPlayed = true;
 
   if (isGameOver()) { // check if game needs to be ended before starting a new round
     roundInProgress = false;
     gameIsOver = true;
     totalGameTime = gdMills() - gameStartTime; // get the total game time
+    if (gameHasBeenPlayed) {
+      sendPacket(totalRxnTimeP1, totalRxnTimeP2, numRounds); // if a game has been played, send data to ArdB
+      printGameData();
+    }
     return;
   }
   
@@ -327,6 +339,90 @@ void startNewRound() {
   scale = true; // enable scaling for next round
   roundInProgress = true;
 }
+// --------------------------------------------- //
+// END OF GAME FUNCTIONS 
+// --------------------------------------------- //
+
+
+// --------------------------------------------- //
+// COMMUNICATION PROTOCOL FUNCTIONS 
+// --------------------------------------------- //
+
+void sendBit(bool bitVal) {
+  digitalWrite(dataOutPin, bitVal ? HIGH : LOW); // if bitVal = 1, send HIGH. else (aka bitVal = 0), send LOW
+  pause(2);  // 2ms per bit
+}
+
+void sendByte(byte data) {
+  for (int i = 7; i >= 0; i--) {
+    bool bitVal = (data >> i) & 0x01;
+    sendBit(bitVal);
+  }
+}
+
+void sendUint16(uint16_t value) {
+  byte msb = (value >> 8) & 0xFF;
+  byte lsb = value & 0xFF;
+  sendByte(msb);
+  sendByte(lsb);
+}
+
+void sendStartBit() {
+  digitalWrite(dataOutPin, HIGH);
+  pause(5);  // 5ms HIGH = start pulse
+  digitalWrite(dataOutPin, LOW);
+  pause(1);  // settle
+}
+
+
+void sendPacket(uint16_t scaledP1, uint16_t scaledP2, uint16_t rounds) {
+  // send start bit to initiate/sync communication between boards 
+  sendStartBit();
+  
+  // send data 
+  sendUint16(scaledP1);
+  sendUint16(scaledP2);
+  sendUint16(rounds);
+}
+
+
+void printGameData() {
+  Serial.println("=== START GAME LOG ===");
+
+  // Log P1 reaction times
+  Serial.println("P1 Reaction Times (ms):");
+  for (int i = 0; i < numRounds; i++) {
+    if (P1RxnTimes[i] != 0) {
+      Serial.println(P1RxnTimes[i]);
+    }
+  }
+
+  // Log P2 reaction times
+  Serial.println("\nP2 Reaction Times (ms):");
+  for (int i = 0; i < numRounds; i++) {
+    if (P2RxnTimes[i] != 0) {
+      Serial.println(P2RxnTimes[i]);
+    }
+  }
+
+  // Log round times
+  Serial.println("\nRound Times (ms):");
+  for (int i = 0; i < numRounds; i++) {
+    if (roundTimes[i] != 0) {
+      Serial.println(roundTimes[i]);
+    }
+  }
+
+  // Log total game time
+  Serial.println("\nTotal Game Time (s):");
+  Serial.println( (float)(totalGameTime/1000) );
+
+  Serial.println("=== END GAME LOG ===");
+}
+
+// --------------------------------------------- //
+// END OF COMMUNICATION PROTOCOL FUNCTIONS 
+// --------------------------------------------- //
 
 
 unsigned long gdMills() {return gdMillis;}
@@ -369,6 +465,7 @@ void setup() {
   pinMode(p2LED_2, OUTPUT);
   pinMode(idleButton, INPUT);
   pinMode(idleLED, OUTPUT);
+  pinMode(dataOutPin, OUTPUT);
   attachInterrupt(digitalPinToInterrupt(interruptPin), ISRTrigger, RISING); 
 
   interrupts(); // enable interrupts
