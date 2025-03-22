@@ -89,7 +89,7 @@ void checkForDoublePress(int button) {
   if (button == 0 || button == 1) {
     if (P1HasReacted) {
       P1Lost = true;
-      roundInProgress = false;
+      // roundInProgress = false;
     } 
     else {
       P1HasReacted = true;
@@ -98,7 +98,7 @@ void checkForDoublePress(int button) {
   if (button == 2 || button == 3) {
     if (P2HasReacted) {
       P2Lost = true;
-      roundInProgress = false;
+      // roundInProgress = false;
     } 
     else {
       P2HasReacted = true;
@@ -135,12 +135,12 @@ void handleButtonPress() {
         }
         else {
           roundInProgress = false;
-          gameIsOver = true;
+          // gameIsOver = true;
         }
       }
       else {
         roundInProgress = false;
-        gameIsOver = true;
+        // gameIsOver = true;
       } 
     }
   else {return;}
@@ -207,6 +207,7 @@ void resetGame() {
   P2HasReacted = false;
   roundInProgress = false;
   gameIsOver = false;
+  scale = false;
 
 
   // Reset time-related variables
@@ -288,14 +289,17 @@ uint16_t generateRandomSeed(int analogPin = 0, int cycleCount = 200) {
   return seed;
 }
 
+// decides whether to start a new round 
 void startNewRound() {
 
   if (isGameOver()) { // check if game needs to be ended before starting a new round
     roundInProgress = false;
     gameIsOver = true;
     totalGameTime = gdMills() - gameStartTime; // get the total game time
-    sendPacket(totalRxnTimeP1, totalRxnTimeP2, numRounds); // if a game has been played, send data to ArdB
+
+    digitalWrite(idleLED, HIGH);
     printGameData(); // print the timing arrays 
+    sendPacket(totalRxnTimeP1, totalRxnTimeP2, numRounds); // if a game has been played, send data to ArdB
     return;
   }
   
@@ -412,7 +416,11 @@ void printGameData() {
   Serial.println("\nTotal Game Time (s):");
   Serial.println( (float)(totalGameTime/1000) );
 
+  Serial.println("\Rounds Played:");
+  Serial.println( numRounds );
+
   Serial.println("=== END GAME LOG ===");
+  return;
 }
 
 // --------------------------------------------- //
@@ -477,6 +485,7 @@ void loop() {
     idle();
     return;
   }
+
   if (roundInProgress) {
 
     handleButtonPress(); // in case players click button before light turns on
@@ -485,7 +494,6 @@ void loop() {
       LEDTimerExpiredP1 = true; // set flag 
       rxnStartTimeP1 = gdMills(); // start reaction timer
       digitalWrite(randomLEDP1, HIGH); // turn LED on
-      // do more stuff
     }
 
     handleButtonPress();
@@ -494,10 +502,10 @@ void loop() {
       LEDTimerExpiredP2 = true; // set flag
       rxnStartTimeP2 = gdMills(); // start reaction timer
       digitalWrite(randomLEDP2, HIGH); // turn LED on
-      // do more stuff 
     }
 
      handleButtonPress();
+
      // each time we call handleButtonPress(), we are checking if a button was pressed, validating the press if it happened, and logging rxn time after validation. otherwise, continue the loop function
   }
 
@@ -506,6 +514,10 @@ void loop() {
       roundTimes[numRounds - 1] = gdMills() - roundStartTime;
       startNewRound(); // start next round
     }
+
+  if (isGameOver()) {
+    startNewRound(); // if the game needs to end, decide NOT to start a new round
+  }
     // TODO: 1. exit game if a player loses 2. save times for round, game, and individual rxn times of each player 3. idle state 4. single player mode 5. class???? 6. scoring 7. debounce handling
 }
 
