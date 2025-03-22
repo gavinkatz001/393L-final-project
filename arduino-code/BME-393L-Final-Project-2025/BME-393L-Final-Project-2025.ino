@@ -31,6 +31,7 @@ unsigned long roundStartTime = 0;
 unsigned long gameStartTime = 0;
 int randomLEDTimerP1 = 0;
 int randomLEDTimerP2 = 0;
+const int maxRounds = 7;
 int P1RxnTimes[maxRounds] = {0}; // this is the per-round rxn time. 
 int P2RxnTimes[maxRounds] = {0}; // this is the per-round rxn time. 
 int roundTimes[maxRounds] = {0}; // time the rounds 
@@ -47,7 +48,6 @@ volatile int buttonValue = -1;
 volatile bool buttonPressed = false;
 
 // other
-const int maxRounds = 7;
 bool scale = false;
 int numRounds = 0;
 float P1Score = 0.0; // TO BE IMPLEMENTED ON ARD2

@@ -9,8 +9,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);  // RS, E, D4, D5, D6, D7
 const int dataInPin = 2;
 
 // Placeholder variables
-uint16_t player1_score_raw = 0;
-uint16_t player2_score_raw = 0;
+uint16_t totalRxnTimeP1 = 0;
+uint16_t totalRxnTimeP2 = 0;
 uint16_t total_rounds_played = 0;
 
 float player1_score = 0.0;
@@ -134,13 +134,13 @@ void loop() {
 
   waitForStartBit();  // Sync with transmission from Arduino A
 
-  player1_score_raw = readUint16();       // Score x10
-  player2_score_raw = readUint16();       // Score x10
+  totalRxnTimeP1 = readUint16();       // Score x10
+  totalRxnTimeP2 = readUint16();       // Score x10
   total_rounds_played = readUint16();
 
   // Convert raw integer scores back to float
-  player1_score = player1_score_raw / 10.0;
-  player2_score = player2_score_raw / 10.0;
+  player1_score = totalRxnTimeP1 / total_rounds_played;
+  player2_score = totalRxnTimeP2 / total_rounds_played;
 
 
   updateLCD();  // Show data on LCD
